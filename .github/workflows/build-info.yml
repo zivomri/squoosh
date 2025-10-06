@@ -9,7 +9,7 @@ on:
 
 env:
   BUILD_NAME: squoosh-build
-  BUILD_NUMBER: ${{ github.run_number }}
+  BUILD_NUMBER: ${{ github.run_number }} # Unique build number for each run
   NODE_VERSION: '18'
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
     - name: Build project
       run: |
         # Build the Squoosh application
-        npm run build --build-name=$BUILD_NAME --build-number=$BUILD_NUMBER
+        npm run build --build-name=$BUILD_NAME --build-number=$BUILD_NUMBER  
 
     - name: Run tests (if available)
       run: |
