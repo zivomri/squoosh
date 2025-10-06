@@ -1,0 +1,131 @@
+name: Build Info with JFrog Integration
+
+on:
+  push:
+    branches: [ main, master, develop, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+  workflow_dispatch:
+
+env:
+  BUILD_NAME: squoosh-build
+  BUILD_NUMBER: ${{ github.run_number }}
+  NODE_VERSION: '18'
+
+jobs:
+  build-info:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Set up JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      with:
+        version: 'latest'
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+
+    - name: Configure NPM
+      run: |
+        jf npm-config --repo-deploy poc-npm --repo-resolve poc-npm
+        
+    - name: Install dependencies with JFrog CLI
+      run: |
+        jf npm install --build-name=$BUILD_NAME --build-number=$BUILD_NUMBER --project poc
+
+    - name: Capture name and version
+      run: |
+        echo NPM_PACKAGE_BUILD_VERSION=$(jq -r '.version' package.json) >> $GITHUB_ENV
+        echo NPM_PACKAGE_NAME=$(jq -r '.name' package.json) >> $GITHUB_ENV
+        
+    - name: Build project
+      run: |
+        # Build the Squoosh application
+        npm run build --build-name=$BUILD_NAME --build-number=$BUILD_NUMBER
+
+    - name: Run tests (if available)
+      run: |
+        # Check if test script exists and run it
+        if npm run | grep -q "test"; then
+          npm test
+        else
+          echo "No test script found in package.json"
+        fi
+      continue-on-error: true
+
+    - name: Publish npm package to JFrog Artifactory
+      run: |
+        jf npm publish --build-name=$BUILD_NAME --build-number=$BUILD_NUMBER --project poc
+
+    - name: Collect build environment info
+      run: |
+        jf rt build-collect-env "$BUILD_NAME" "$BUILD_NUMBER" --project poc
+        
+    - name: Collect VCS information
+      run: |
+        jf rt build-add-git $BUILD_NAME $BUILD_NUMBER --project=poc
+        
+    - name: Publish build info to JFrog Artifactory
+      run: |
+        jf rt build-publish "$BUILD_NAME" "$BUILD_NUMBER" --project poc
+        
+    - name: Xray Build Scan
+      run: |
+        jf build-scan $BUILD_NAME $BUILD_NUMBER --format=table --fail=false --project=poc
+      continue-on-error: true
+    - name: Display build information
+      run: |
+        echo "### Build Information"
+        echo "- **Build Name:** $BUILD_NAME"
+        echo "- **Build Number:** $BUILD_NUMBER"
+        echo "- **Package:** $NPM_PACKAGE_NAME@$NPM_PACKAGE_BUILD_VERSION"
+        echo "- **Node.js Version:** ${{ env.NODE_VERSION }}"
+        echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "- **Commit SHA:** ${{ github.sha }}"
+        echo "- **Short SHA:** ${GITHUB_SHA:0:7}"
+        echo "- **Branch:** ${{ github.ref_name }}"
+        echo "- **Repository:** ${{ github.repository }}"
+        echo "- **Actor:** ${{ github.actor }}"
+    
+    - name: Create build info summary
+      run: |
+        mkdir -p build-artifacts
+        cat > build-artifacts/build-summary.json << EOF
+        {
+          "build_name": "$BUILD_NAME",
+          "build_number": "$BUILD_NUMBER",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "commit_sha": "${{ github.sha }}",
+          "commit_short_sha": "${GITHUB_SHA:0:7}",
+          "branch_name": "${{ github.ref_name }}",
+          "repository": "${{ github.repository }}",
+          "actor": "${{ github.actor }}",
+          "workflow_run_id": "${{ github.run_id }}",
+          "node_version": "${{ env.NODE_VERSION }}",
+          "package_name": "$NPM_PACKAGE_NAME",
+          "package_version": "$NPM_PACKAGE_BUILD_VERSION"
+        }
+        EOF
+    
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: squoosh-build-artifacts
+        path: |
+          .tmp/build/
+          dist/
+          build/
+        retention-days: 30
+      if: always()
