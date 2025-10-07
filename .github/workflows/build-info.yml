@@ -39,8 +39,9 @@ jobs:
     - name: Configure NPM
       run: |
         jf npm-config --repo-deploy poc-npm --repo-resolve poc-npm
-        - name: Clean npm cache and lock file
-          run: rm -rf node_modules/ package-lock.json
+    - name: Clean npm cache and lock file
+      run:  |
+        rm -rf node_modules/ package-lock.json
     - name: Run JFrog NPM Audit
       run: |
         jf audit --npm --project poc
