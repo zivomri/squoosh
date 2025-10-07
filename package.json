@@ -12,7 +12,7 @@
     "serve": "serve --listen=$DEV_PORT --config ../../../serve.json .tmp/build/static",
     "prepare": "husky install"
   },
-  "devDependencies": {
+  "dependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.1.0",
     "@rollup/plugin-replace": "^2.3.4",

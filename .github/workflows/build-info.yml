@@ -70,7 +70,7 @@ jobs:
         jf rt build-publish "$BUILD_NAME" "$BUILD_NUMBER" --project poc
     - name: Scan Build Info with JFrog Xray
       run: |
-        jf build-scan --format=json "$build_name" "$build_number" --project poc
+        jf build-scan "$BUILD_NAME" "$BUILD_NUMBER" --format=json --project poc
     - name: Display build information
       run: |
         echo "### Build Information"
