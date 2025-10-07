@@ -1,0 +1,8 @@
+version: 1
+type: npm
+resolver:
+    repo: poc-npm
+    serverId: master_splinter
+deployer:
+    repo: poc-npm
+    serverId: master_splinter
